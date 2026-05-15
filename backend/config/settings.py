@@ -5,6 +5,7 @@ For production use, move SECRET_KEY to an environment variable and
 set DEBUG = False.
 """
 
+import os
 from pathlib import Path
 
 # Paths
@@ -95,5 +96,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # allowed per IP per window.
 RATE_LIMIT_MAX_REQUESTS = 5    # max requests per window
 RATE_LIMIT_WINDOW_SECONDS = 60 # window duration in seconds
+RATE_LIMIT_REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+RATE_LIMIT_REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
+RATE_LIMIT_REDIS_DB = int(os.getenv('REDIS_DB', '0'))
+RATE_LIMIT_REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', '') or None
+RATE_LIMIT_REDIS_PREFIX = os.getenv('REDIS_PREFIX', 'rate-limit')
 
 

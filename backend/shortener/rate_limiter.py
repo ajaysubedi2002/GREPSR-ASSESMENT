@@ -1,35 +1,58 @@
 """
 rate_limiter.py
 ---------------
-Custom Fixed Window rate limiter. No third-party library is used.
+Custom Fixed Window rate limiter backed by Redis.
 
 Algorithm
 ---------
-Each IP address owns one row in RateLimitEntry with three fields:
-  ip_address    - primary lookup key
-  window_start  - Unix timestamp when the current window started
-  request_count - how many requests have been made in this window
+Each IP address has one Redis key with a TTL equal to the window size.
+The key stores a counter for that IP within the current window.
 
 On every POST /api/shorten/ call:
-  1. Fetch (or create) the row for this IP inside SELECT FOR UPDATE.
-  2. If the window has expired (now - window_start >= WINDOW_SECONDS):
-       reset window_start = now, request_count = 1, allow the request.
-  3. If request_count >= MAX_REQUESTS:
-       raise RateLimitExceeded with seconds remaining until window resets.
-  4. Otherwise increment request_count and allow the request.
+    1. Atomically INCR the counter and ensure the key has a TTL.
+    2. If the counter exceeds MAX_REQUESTS, return Retry-After from TTL.
+    3. Otherwise allow the request.
 
-Complexity: O(1) per check. No background cleanup needed - stale windows
-are overwritten lazily on the next request from that IP.
+Complexity: O(1) per check. No background cleanup needed - Redis expires
+keys automatically when the window ends.
 """
 
-import time
 from django.conf import settings
-from django.db import transaction
-
-from .models import RateLimitEntry
+from redis import Redis
+from redis.exceptions import RedisError
 
 MAX_REQUESTS: int = getattr(settings, 'RATE_LIMIT_MAX_REQUESTS', 5)
 WINDOW_SECONDS: int = getattr(settings, 'RATE_LIMIT_WINDOW_SECONDS', 60)
+REDIS_HOST: str = getattr(settings, 'RATE_LIMIT_REDIS_HOST', 'localhost')
+REDIS_PORT: int = getattr(settings, 'RATE_LIMIT_REDIS_PORT', 6379)
+REDIS_DB: int = getattr(settings, 'RATE_LIMIT_REDIS_DB', 0)
+REDIS_PASSWORD: str | None = getattr(settings, 'RATE_LIMIT_REDIS_PASSWORD', None)
+REDIS_PREFIX: str = getattr(settings, 'RATE_LIMIT_REDIS_PREFIX', 'rate-limit')
+
+_redis_client: Redis | None = None
+
+_INCR_WITH_TTL_SCRIPT = """
+local current = redis.call('INCR', KEYS[1])
+local ttl = redis.call('TTL', KEYS[1])
+if ttl == -1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+  ttl = ARGV[1]
+end
+return {current, ttl}
+"""
+
+
+def _get_redis_client() -> Redis:
+    global _redis_client
+    if _redis_client is None:
+        _redis_client = Redis(
+            host=REDIS_HOST,
+            port=REDIS_PORT,
+            db=REDIS_DB,
+            password=REDIS_PASSWORD,
+            decode_responses=False,
+        )
+    return _redis_client
 
 
 def get_client_ip(request) -> str:
@@ -62,36 +85,31 @@ def check_rate_limit(ip_address: str) -> None:
     """
     Check and update the rate-limit state for the given IP address.
 
-    Uses SELECT FOR UPDATE inside an atomic transaction to avoid race
-    conditions when concurrent requests arrive from the same IP.
-
     Args:
         ip_address: The client's IP address string.
 
     Raises:
         RateLimitExceeded: if the IP has reached MAX_REQUESTS in this window.
     """
-    now: float = time.time()
+    client = _get_redis_client()
+    key = f"{REDIS_PREFIX}:{ip_address}"
 
-    with transaction.atomic():
-        entry, _created = RateLimitEntry.objects.select_for_update().get_or_create(
-            ip_address=ip_address,
-            defaults={
-                'window_start': now,
-                'request_count': 0,
-            },
-        )
+    try:
+        count, ttl = client.eval(_INCR_WITH_TTL_SCRIPT, 1, key, WINDOW_SECONDS)
+    except RedisError:
+        # Fail open if Redis is unavailable to avoid blocking the API.
+        return
 
-        elapsed: float = now - entry.window_start
+    try:
+        count_value = int(count)
+    except (TypeError, ValueError):
+        return
 
-        if elapsed >= WINDOW_SECONDS:
-            # Window has expired - start a fresh window
-            entry.window_start = now
-            entry.request_count = 1
-        else:
-            if entry.request_count >= MAX_REQUESTS:
-                retry_after = int(WINDOW_SECONDS - elapsed) + 1
-                raise RateLimitExceeded(retry_after=retry_after)
-            entry.request_count += 1
-
-        entry.save()
+    if count_value > MAX_REQUESTS:
+        try:
+            ttl_value = int(ttl)
+        except (TypeError, ValueError):
+            ttl_value = WINDOW_SECONDS
+        if ttl_value < 1:
+            ttl_value = WINDOW_SECONDS
+        raise RateLimitExceeded(retry_after=ttl_value)

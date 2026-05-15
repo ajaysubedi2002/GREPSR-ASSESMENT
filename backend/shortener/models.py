@@ -54,26 +54,3 @@ class Click(models.Model):
     def __str__(self) -> str:
         return f"Click on {self.shortened_url.alias} at {self.clicked_at}"
 
-
-class RateLimitEntry(models.Model):
-    """
-    Tracks URL-shortening requests per IP for the Fixed Window rate limiter.
-
-    Fields:
-      ip_address    — the client IP (one row per IP, enforced by unique_together)
-      window_start  — Unix timestamp when the current 60-second window began
-      request_count — number of shortening requests made in this window
-
-    This table is read and written inside a SELECT FOR UPDATE transaction on
-    every POST /api/shorten/ request.
-    """
-
-    ip_address = models.GenericIPAddressField(db_index=True, unique=True)
-    window_start = models.FloatField()      # Unix epoch float
-    request_count = models.PositiveIntegerField(default=0)
-
-    def __str__(self) -> str:
-        return (
-            f"{self.ip_address}: {self.request_count} req "
-            f"(window started {self.window_start})"
-        )
