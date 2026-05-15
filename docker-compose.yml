@@ -1,35 +1,48 @@
-version: '3.9'
+version: "3.9"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    env_file:
+      - ./backend/config/.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    container_name: redis
     restart: unless-stopped
 
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Docker/Dockerfile
+    container_name: django_backend
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app
+    env_file:
+      - ./backend/config/.env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
+      - DB_HOST=postgres
       - REDIS_HOST=redis
-      - REDIS_PORT=6379
     depends_on:
+      - postgres
       - redis
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Docker/Dockerfile
+    container_name: react_frontend
     ports:
-      - "3000:80"
+      - "5173:80"
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  postgres_data:

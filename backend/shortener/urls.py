@@ -1,5 +1,10 @@
 from django.urls import path
-from .views import ShortenURLView, URLListView, URLDetailView, URLAnalyticsView
+from .views import (
+    ShortenURLView,
+    URLListView,
+    URLDetailView,
+    URLAnalyticsView,
+)
 
 app_name = 'shortener'
 

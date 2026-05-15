@@ -90,4 +90,5 @@ class AnalyticsResponseSerializer(serializers.Serializer):
 
     alias = serializers.CharField()
     original_url = serializers.URLField()
+    short_url = serializers.URLField()
     data = AnalyticsDataPointSerializer(many=True)

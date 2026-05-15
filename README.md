@@ -1,148 +1,97 @@
+# Grepsr Assessment
 
-# URL Shortener with Analytics
+URL shortener with Django REST API, Redis rate limiting, PostgreSQL storage, and a React + Vite frontend served by Nginx.
 
-A Django REST Framework backend that shortens URLs, tracks clicks with
-timestamps, and enforces per-IP rate limiting using a custom Fixed Window
-algorithm. Paired with a React analytics dashboard (see `/frontend`).
+## Quick start (Docker)
 
----
+### Prerequisites
 
-## Quick Start
+- Docker + Docker Compose
 
-### Option A - Docker (recommended)
-
-```bash
-# Clone the repo
-git clone https://github.com/YOUR_USERNAME/url-shortener.git
-cd url-shortener
-
-# Build and start
-docker-compose up --build
-```
-
-API available at **http://localhost:8000**
-
----
-
-### Option B - Local Python
+### Run the stack
 
 ```bash
-cd backend
-
-# Create and activate virtual environment
-python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Apply database migrations
-python manage.py migrate
-
-# Start the development server
-python manage.py runserver
+docker compose up --build
 ```
 
-API available at **http://localhost:8000**
+Services and ports:
 
----
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000/api/schema/swagger-ui/
+- PostgreSQL: localhost:5432 (internal service name: `postgres`)
+- Redis: localhost:6379 (internal service name: `redis`)
 
-## API Endpoints
+### First-time database setup
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/shorten/` | Shorten a URL (rate-limited: 5/min per IP) |
-| `GET` | `/api/urls/` | List all shortened URLs |
-| `GET` | `/api/urls/<alias>/` | Detail + click count for one alias |
-| `GET` | `/api/urls/<alias>/analytics/` | Daily clicks over the last 7 days |
-| `GET` | `/<alias>/` | Redirect to original URL + record click |
-
-Full request/response examples are in `API_DOCS.md`.
-
----
-
-## Rate Limiter - Implementation
-
-The rate limiter lives in `backend/shortener/rate_limiter.py`. No third-party
-library is used - it is implemented from scratch using the **Fixed Window**
-algorithm.
-
-### How it works
-
-Each IP address has one row in the `RateLimitEntry` database table:
-
-| Field | Type | Purpose |
-|-------|------|---------|
-| `ip_address` | string | Primary lookup key (unique) |
-| `window_start` | float | Unix timestamp when the current window started |
-| `request_count` | int | Requests made in this window |
-
-On every `POST /api/shorten/` request:
-
-1. The client IP is extracted (honouring `X-Forwarded-For` for proxies).
-2. The `RateLimitEntry` row is fetched with `SELECT FOR UPDATE` inside a
-	`transaction.atomic()` block to prevent race conditions.
-3. `elapsed = now - window_start` is computed.
-4. **If `elapsed >= 60s`** - the window has expired. Reset `window_start = now`
-	and `request_count = 1`. Allow the request.
-5. **If `request_count >= 5`** - limit reached. Return HTTP 429 with
-	`retry_after_seconds = ceil(60 - elapsed)`.
-6. **Otherwise** - increment `request_count` and allow the request.
-
-### Why Fixed Window?
-
-Fixed Window is O(1) per check and requires no background cleanup process.
-The only trade-off is a potential burst at window boundaries (up to 10 requests
-in a short time if a client fires 5 just before the reset and 5 just after),
-which is acceptable for a URL-shortening service.
-
-### 429 Response Shape
-
-```json
-{
-  "error": "Rate limit exceeded.",
-  "retry_after_seconds": 42,
-  "message": "You can shorten up to 5 URLs per minute. Please wait 42 second(s)."
-}
+```bash
+docker compose exec backend python manage.py migrate
 ```
 
-The `Retry-After: 42` HTTP header is also included.
+(Optional) Create a Django superuser:
 
----
-
-## Project Structure
-
-```
-url-shortener/
-├── backend/
-│   ├── config/
-│   │   ├── settings.py        Django settings + rate-limiter constants
-│   │   └── urls.py            Root URL router
-│   ├── shortener/
-│   │   ├── migrations/        Auto-generated DB migrations
-│   │   ├── models.py          ShortenedURL, Click, RateLimitEntry
-│   │   ├── rate_limiter.py    Custom Fixed Window rate limiter
-│   │   ├── serializers.py     DRF request/response serializers
-│   │   ├── views.py           API views (shorten, list, detail, analytics)
-│   │   ├── redirect_views.py  /{alias}/ redirect + click tracking
-│   │   ├── urls.py            /api/ route definitions
-│   │   └── redirect_urls.py   /{alias}/ route definition
-│   ├── manage.py
-│   ├── requirements.txt
-│   └── Dockerfile
-├── frontend/                  React app (see frontend/README.md)
-├── docker-compose.yml
-└── README.md
+```bash
+docker compose exec backend python manage.py createsuperuser
 ```
 
----
+### Stop and clean up
 
-## Configuration
+```bash
+docker compose down
+```
 
-| Setting | Default | File |
-|---------|---------|------|
-| `RATE_LIMIT_MAX_REQUESTS` | 5 | `config/settings.py` |
-| `RATE_LIMIT_WINDOW_SECONDS` | 60 | `config/settings.py` |
-| `CORS_ALLOW_ALL_ORIGINS` | `True` | `config/settings.py` |
-| Database | SQLite (`db.sqlite3`) | `config/settings.py` |
+To remove volumes (including the database data):
 
+```bash
+docker compose down -v
+```
+
+## Environment files
+
+The backend uses a single env file:
+
+- `backend/config/.env`
+
+Docker Compose loads this file for both the `postgres` and `backend` services (see `docker-compose.yml`). The compose file also overrides some values at runtime:
+
+- `DB_HOST` is set to `postgres`
+- `REDIS_HOST` is set to `redis`
+
+That lets the containers reach each other by service name even though the `.env` file contains localhost values for local development.
+
+### Current .env contents
+
+```env
+SECRET_KEY=django-insecure-m*=+1e^oi@vqtma^v6mhz6207gq9bcn_y7daepx-82i0hsy*+0
+ALLOWED_HOSTS=127.0.0.1,localhost
+
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+REDIS_PASSWORD=
+REDIS_PREFIX=rate-limit
+
+DB_ENGINE=django.db.backends.postgresql
+DB_NAME=grepsr
+DB_USER=grepsr
+DB_PASSWORD=grepsr
+DB_HOST=127.0.0.1
+DB_PORT=5432
+
+POSTGRES_DB=grepsr
+POSTGRES_USER=grepsr
+POSTGRES_PASSWORD=grepsr
+```
+
+If you change any values, rebuild or restart the services:
+
+```bash
+docker compose up --build
+```
+
+## Local (non-Docker) quick notes
+
+If you prefer running locally:
+
+- Backend: create a virtual env, install `backend/requirements.txt`, and set `backend/config/.env`.
+- Frontend: run `npm install` in `frontend/` and `npm run dev`.
+- Make sure PostgreSQL and Redis are running locally on the ports specified in the env file.

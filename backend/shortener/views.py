@@ -230,6 +230,7 @@ class URLAnalyticsView(APIView):
             {
                 'alias': url.alias,
                 'original_url': url.original_url,
+                'short_url': request.build_absolute_uri(f'/{url.alias}/'),
                 'data': serializer.data,
             },
             status=status.HTTP_200_OK,

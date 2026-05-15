@@ -1,105 +1,126 @@
-"""
-Django settings for the URL Shortener project.
-
-For production use, move SECRET_KEY to an environment variable and
-set DEBUG = False.
-"""
-
 import os
 from pathlib import Path
 
-# Paths
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Security
-# IMPORTANT: Replace this with a real secret in production (use env var).
-SECRET_KEY = 'django-insecure-replace-this-before-deploying-to-production'
-DEBUG = True
-ALLOWED_HOSTS = ['*']
+load_dotenv(BASE_DIR / "config" / ".env")
 
-# Installed Apps
+
+
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+    os.getenv("DJANGO_SECRET_KEY", "django-insecure-change-this-before-production")
+)
+
+# Only allow local Django access
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+    if host.strip()
+]
+
 INSTALLED_APPS = [
-    # Django internals (contenttypes + auth needed for migrations)
-    'django.contrib.contenttypes',
-    'django.contrib.auth',
+    # Django
+    "django.contrib.contenttypes",
+    "django.contrib.auth",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+
     # Third-party
-    'rest_framework',
-    'corsheaders',
-    'drf_spectacular',
+    "rest_framework",
+    "corsheaders",
+    "drf_spectacular",
 
-    # Local
-    'shortener',
+    # Local apps
+    "shortener",
 ]
 
-
-
-# Middleware
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',   # Must be first
-    'django.middleware.common.CommonMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
 ]
 
-# URL Configuration
-ROOT_URLCONF = 'config.urls'
 
-# Templates
+ROOT_URLCONF = "config.urls"
+WSGI_APPLICATION = "config.wsgi.application"
+
+
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
             ],
         },
     },
 ]
 
-# Database
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
+        "NAME": os.getenv("DB_NAME", "grepsr"),
+        "USER": os.getenv("DB_USER", "grepsr"),
+        "PASSWORD": os.getenv("DB_PASSWORD", "grepsr"),
+        "HOST": os.getenv("DB_HOST", "127.0.0.1"),
+        "PORT": os.getenv("DB_PORT", "5432"),
     }
 }
 
-# CORS
-# Allow only the React frontend origin.
+
 CORS_ALLOW_ALL_ORIGINS = False
+
 CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
+    "http://localhost:5173",
+    'http://localhost:8000',
+    "http://127.0.0.1:5173",
 ]
 
-# Django REST Framework
-REST_FRAMEWORK = {
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-    ],
-    'DEFAULT_PARSER_CLASSES': [
-        'rest_framework.parsers.JSONParser',
-    ],
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+CORS_ALLOW_HEADERS = [
+    "content-type",
+    "authorization",
+]
 
+REST_FRAMEWORK = {
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+    ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
-# Timezone
+
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
+USE_I18N = True
 USE_TZ = True
-TIME_ZONE = 'UTC'
-
-# Primary Key
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# Rate Limiter
-# These constants are read by shortener/rate_limiter.py.
-# Change RATE_LIMIT_MAX_REQUESTS to adjust how many shortenings are
-# allowed per IP per window.
-RATE_LIMIT_MAX_REQUESTS = 5    # max requests per window
-RATE_LIMIT_WINDOW_SECONDS = 60 # window duration in seconds
-RATE_LIMIT_REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
-RATE_LIMIT_REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
-RATE_LIMIT_REDIS_DB = int(os.getenv('REDIS_DB', '0'))
-RATE_LIMIT_REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', '') or None
-RATE_LIMIT_REDIS_PREFIX = os.getenv('REDIS_PREFIX', 'rate-limit')
 
 
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+RATE_LIMIT_MAX_REQUESTS = 5
+RATE_LIMIT_WINDOW_SECONDS = 60
+
+RATE_LIMIT_REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+RATE_LIMIT_REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+RATE_LIMIT_REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+RATE_LIMIT_REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "") or None
+RATE_LIMIT_REDIS_PREFIX = os.getenv("REDIS_PREFIX", "rate-limit")

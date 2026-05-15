@@ -9,7 +9,11 @@
  * Base URL is defined once. Change it here to point at a different environment.
  */
 
-const BASE_URL = 'http://localhost:8000';
+export const BASE_URL = 'http://localhost:8000';
+
+export function buildShortUrl(alias) {
+  return `${BASE_URL}/${alias}/`;
+}
 
 /**
  * Shorten a long URL.
@@ -26,7 +30,7 @@ const BASE_URL = 'http://localhost:8000';
  * caller can read retry_after_seconds and show a countdown timer.
  */
 export async function shortenURL(url) {
-  const response = await fetch(`${BASE_URL}/api/shorten/`, {
+  const response = await fetch(`${BASE_URL}/api/v1/shorten/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url }),
@@ -47,7 +51,7 @@ export async function shortenURL(url) {
  * Throws on network error. Returns empty array if backend returns [].
  */
 export async function fetchAllURLs() {
-  const response = await fetch(`${BASE_URL}/api/urls/`);
+  const response = await fetch(`${BASE_URL}/api/v1/urls/`);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch URLs (${response.status})`);
@@ -66,7 +70,7 @@ export async function fetchAllURLs() {
  * Throws on network error or 404.
  */
 export async function fetchAnalytics(alias) {
-  const response = await fetch(`${BASE_URL}/api/urls/${alias}/analytics/`);
+  const response = await fetch(`${BASE_URL}/api/v1/urls/${alias}/analytics/`);
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));

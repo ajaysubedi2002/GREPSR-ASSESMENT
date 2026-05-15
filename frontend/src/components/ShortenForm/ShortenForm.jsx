@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { shortenURL } from '../../api/api.js';
-import './ShortenForm.css';
 
 /**
  * ShortenForm
@@ -88,12 +87,19 @@ export default function ShortenForm({ onSuccess }) {
   const isDisabled = status === 'loading' || status === 'rate_limited';
 
   return (
-    <section className="shorten-form-section">
-      <h2 className="shorten-form-title">Shorten a URL</h2>
+    <section className="space-y-3">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">
+          Shorten a URL
+        </p>
+        <h2 className="text-2xl font-semibold text-slate-900">
+          Create a compact link instantly
+        </h2>
+      </div>
 
-      <form className="shorten-form" onSubmit={handleSubmit} noValidate>
+      <form className="flex flex-wrap gap-2" onSubmit={handleSubmit} noValidate>
         <input
-          className="shorten-input"
+          className="min-w-[260px] flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-emerald-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
           type="url"
           placeholder="https://example.com/very/long/path"
           value={inputURL}
@@ -103,7 +109,7 @@ export default function ShortenForm({ onSuccess }) {
         />
 
         <button
-          className={`shorten-btn ${isDisabled ? 'shorten-btn--disabled' : ''}`}
+          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-400"
           type="submit"
           disabled={isDisabled}
         >
@@ -114,30 +120,33 @@ export default function ShortenForm({ onSuccess }) {
       </form>
 
       {status === 'rate_limited' && (
-        <div className="shorten-banner shorten-banner--warning" role="alert">
-          Rate limit reached. You can shorten 5 URLs per minute.
-          Please wait <strong>{countdown} second{countdown !== 1 ? 's' : ''}</strong>.
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
+          Rate limit reached. You can shorten 5 URLs per minute. Please wait{' '}
+          <strong>{countdown} second{countdown !== 1 ? 's' : ''}</strong>.
         </div>
       )}
 
       {status === 'error' && (
-        <div className="shorten-banner shorten-banner--error" role="alert">
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">
           Error: {errorMsg}
         </div>
       )}
 
       {status === 'success' && result && (
-        <div className="shorten-result" role="status">
-          <span className="shorten-result__label">Your short URL:</span>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900" role="status">
+          <span className="font-semibold">Your short URL:</span>
           <a
-            className="shorten-result__link"
+            className="break-all text-emerald-700 underline-offset-2 hover:underline"
             href={result.short_url}
             target="_blank"
             rel="noopener noreferrer"
           >
             {result.short_url}
           </a>
-          <button className="shorten-result__copy" onClick={handleCopy}>
+          <button
+            className="rounded-md bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:bg-slate-800"
+            onClick={handleCopy}
+          >
             Copy
           </button>
         </div>
