@@ -1,4 +1,21 @@
+# TASK 11 — README.md
 
+## Goal
+Write the project README. It is a graded deliverable — the reviewer reads it
+before running a single command. It must cover: how to run, how the rate limiter
+works, and the project structure.
+
+---
+
+## File to Create
+
+**`README.md`** at the repository root.
+
+---
+
+## Full File Content
+
+```markdown
 # URL Shortener with Analytics
 
 A Django REST Framework backend that shortens URLs, tracks clicks with
@@ -9,7 +26,7 @@ algorithm. Paired with a React analytics dashboard (see `/frontend`).
 
 ## Quick Start
 
-### Option A - Docker (recommended)
+### Option A — Docker (recommended)
 
 ```bash
 # Clone the repo
@@ -24,7 +41,7 @@ API available at **http://localhost:8000**
 
 ---
 
-### Option B - Local Python
+### Option B — Local Python
 
 ```bash
 cd backend
@@ -61,10 +78,10 @@ Full request/response examples are in `API_DOCS.md`.
 
 ---
 
-## Rate Limiter - Implementation
+## Rate Limiter — Implementation
 
 The rate limiter lives in `backend/shortener/rate_limiter.py`. No third-party
-library is used - it is implemented from scratch using the **Fixed Window**
+library is used — it is implemented from scratch using the **Fixed Window**
 algorithm.
 
 ### How it works
@@ -81,13 +98,13 @@ On every `POST /api/shorten/` request:
 
 1. The client IP is extracted (honouring `X-Forwarded-For` for proxies).
 2. The `RateLimitEntry` row is fetched with `SELECT FOR UPDATE` inside a
-	`transaction.atomic()` block to prevent race conditions.
+   `transaction.atomic()` block to prevent race conditions.
 3. `elapsed = now - window_start` is computed.
-4. **If `elapsed >= 60s`** - the window has expired. Reset `window_start = now`
-	and `request_count = 1`. Allow the request.
-5. **If `request_count >= 5`** - limit reached. Return HTTP 429 with
-	`retry_after_seconds = ceil(60 - elapsed)`.
-6. **Otherwise** - increment `request_count` and allow the request.
+4. **If `elapsed >= 60s`** — the window has expired. Reset `window_start = now`
+   and `request_count = 1`. Allow the request.
+5. **If `request_count >= 5`** — limit reached. Return HTTP 429 with
+   `retry_after_seconds = ceil(60 - elapsed)`.
+6. **Otherwise** — increment `request_count` and allow the request.
 
 ### Why Fixed Window?
 
@@ -145,4 +162,26 @@ url-shortener/
 | `RATE_LIMIT_WINDOW_SECONDS` | 60 | `config/settings.py` |
 | `CORS_ALLOW_ALL_ORIGINS` | `True` | `config/settings.py` |
 | Database | SQLite (`db.sqlite3`) | `config/settings.py` |
+```
 
+---
+
+## Acceptance Criteria
+
+- [ ] README exists at repo root as `README.md`
+- [ ] Docker run instructions work copy-paste with no prior knowledge
+- [ ] Local Python run instructions include virtualenv activation step
+- [ ] Rate limiter section explains the algorithm (Fixed Window), not just the result
+- [ ] The 429 response shape is shown
+- [ ] Project structure tree is present
+- [ ] No placeholder text like "TODO" or "coming soon" remains
+
+---
+
+## Common Failure Modes
+
+| Problem | Fix |
+|---------|-----|
+| Docker instructions assume image is pre-built | Include `--build` flag in `docker-compose up` |
+| Rate limiter section says "we used X library" | It is a custom implementation — make that explicit |
+| Missing `source .venv/bin/activate` step | Reviewers on macOS/Linux will hit `pip: command not found` without it |
