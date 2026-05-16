@@ -1,8 +1,0 @@
-Django
-djangorestframework
-django-cors-headers
-drf-spectacular
-redis
-python-dotenv
-psycopg2-binary
- 

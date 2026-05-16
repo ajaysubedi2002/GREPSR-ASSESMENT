@@ -4,4 +4,7 @@ db.sqlite3
 *.pyc
 *.pyo
 *.pyd   
-*.env        
+*.env  
+migrations/
+staticfiles/
+media/      

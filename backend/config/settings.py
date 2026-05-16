@@ -3,9 +3,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent
 
-load_dotenv(BASE_DIR / "config" / ".env")
+PROJECT_ROOT = BASE_DIR.parent.parent
+
+load_dotenv(PROJECT_ROOT / ".env")
+
 
 
 
@@ -13,6 +16,8 @@ SECRET_KEY = os.getenv(
     "SECRET_KEY",
     os.getenv("DJANGO_SECRET_KEY", "django-insecure-change-this-before-production")
 )
+
+DEBUG = True
 
 # Only allow local Django access
 ALLOWED_HOSTS = [
@@ -23,6 +28,7 @@ ALLOWED_HOSTS = [
 
 INSTALLED_APPS = [
     # Django
+    "django.contrib.admin",
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.sessions",
@@ -60,6 +66,8 @@ TEMPLATES = [
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.request",
             ],
         },

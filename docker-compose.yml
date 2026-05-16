@@ -1,48 +1,93 @@
-version: "3.9"
-
 services:
-  postgres:
+  db:
     image: postgres:16-alpine
-    container_name: postgres
-    env_file:
-      - ./backend/config/.env
+    container_name: grepsr-db
+    env_file: .env
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5444:5432"
+    networks:
+      - grepsr
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   redis:
     image: redis:7-alpine
-    container_name: redis
-    restart: unless-stopped
+    container_name: grepsr-redis
+    ports:
+      - "6380:6379"
+    networks:
+      - grepsr
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Docker/Dockerfile
+    container_name: grepsr-migrate
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy    # ← waits until postgres is actually ready
+      redis:
+        condition: service_healthy
+    command: ["python", "manage.py", "migrate"]
+    volumes:
+      - ./backend:/app
+    networks:
+      - grepsr
 
   backend:
     build:
       context: ./backend
       dockerfile: Docker/Dockerfile
-    container_name: django_backend
+    container_name: grepsr-backend
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
     ports:
       - "8000:8000"
-    env_file:
-      - ./backend/config/.env
-    environment:
-      - DJANGO_SETTINGS_MODULE=config.settings
-      - DB_HOST=postgres
-      - REDIS_HOST=redis
     depends_on:
-      - postgres
-      - redis
-    restart: unless-stopped
+      db:
+        condition: service_healthy    # ← same here
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully  # ← waits for migrations to finish
+    volumes:
+      - ./backend:/app
+    networks:
+      - grepsr
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Docker/Dockerfile
-    container_name: react_frontend
+      target: dev
+    container_name: grepsr-frontend
     ports:
-      - "5173:80"
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
-    restart: unless-stopped
+    networks:
+      - grepsr
 
 volumes:
-  postgres_data:
+  pgdata:
+
+networks:
+  grepsr:
+    driver: bridge
