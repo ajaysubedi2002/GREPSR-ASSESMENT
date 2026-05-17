@@ -31,10 +31,9 @@ Accessible services (default ports):
 
 ### First-time setup
 
-Run database migrations and (optionally) create a superuser:
+Database migrations run automatically when the stack starts. To create a superuser (optional):
 
 ```bash
-docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py createsuperuser
 ```
 

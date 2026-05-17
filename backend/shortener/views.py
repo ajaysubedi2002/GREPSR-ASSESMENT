@@ -1,15 +1,3 @@
-"""
-views.py
---------
-All API views for the URL shortener.
-
-Endpoints:
-  POST /api/shorten/                - shorten a URL (rate-limited)
-  GET  /api/urls/                   - list all shortened URLs
-  GET  /api/urls/<alias>/           - detail for one alias
-  GET  /api/urls/<alias>/analytics/ - 7-day click analytics
-"""
-
 from datetime import date, timedelta
 
 from django.utils import timezone
